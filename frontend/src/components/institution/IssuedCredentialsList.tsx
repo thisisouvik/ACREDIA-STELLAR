@@ -28,7 +28,7 @@ import {
     XCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { useActiveAccount } from 'thirdweb/react';
+import { useStellarAccount } from '@/contexts/StellarContext';
 import { toast } from 'sonner';
 
 interface IssuedCredentialsListProps {
@@ -55,7 +55,7 @@ export function IssuedCredentialsList({ institutionId, refreshTrigger }: IssuedC
     const [revokeDialogOpen, setRevokeDialogOpen] = useState(false);
     const [credentialToRevoke, setCredentialToRevoke] = useState<Credential | null>(null);
     const [isRevoking, setIsRevoking] = useState(false);
-    const account = useActiveAccount();
+    const { address } = useStellarAccount();
 
     const loadCredentials = async () => {
         try {
@@ -78,7 +78,7 @@ export function IssuedCredentialsList({ institutionId, refreshTrigger }: IssuedC
     };
 
     const handleRevokeConfirm = async () => {
-        if (!account) {
+        if (!address) {
             toast.error('Please connect your wallet first');
             return;
         }
@@ -90,7 +90,7 @@ export function IssuedCredentialsList({ institutionId, refreshTrigger }: IssuedC
 
         setIsRevoking(true);
         try {
-            await revokeCredentialById(credentialToRevoke.id, account);
+            await revokeCredentialById(credentialToRevoke.id, address);
             toast.success('Credential revoked successfully on blockchain and database');
             setRevokeDialogOpen(false);
             setCredentialToRevoke(null);
@@ -286,9 +286,9 @@ export function IssuedCredentialsList({ institutionId, refreshTrigger }: IssuedC
                                     <div className="text-sm text-yellow-800">
                                         <p className="font-medium mb-1">Important:</p>
                                         <p>You must use the same wallet that issued this credential.</p>
-                                        {account?.address && (
+                                        {address && (
                                             <p className="mt-1 font-mono text-xs break-all">
-                                                Connected: {account.address}
+                                                Connected: {address}
                                             </p>
                                         )}
                                     </div>

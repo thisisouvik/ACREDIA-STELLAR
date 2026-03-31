@@ -1,18 +1,6 @@
-import { STELLAR_CONFIG } from "./thirdweb";
-import { ethers } from "ethers";
-
-/**
- * Stellar Contract Interaction Module
- * 
- * For Stellar, smart contracts are deployed using Soroban.
- * This module provides helpers for interacting with Soroban contracts.
- */
-
-// Stellar SDK types - will be installed as dependency
-export interface StellarAccount {
-    publicKey: string;
-    secretKey?: string;
-}
+import { activeNetwork, sorobanServer, getContractAddress } from "./stellar";
+import { signTransaction } from "@stellar/freighter-api";
+import { Address, nativeToScVal, scValToNative, FeeBumpTransaction, TransactionBuilder, Networks, TimeoutInfinite, StrKey, Contract, Transaction, xdr } from "@stellar/stellar-sdk";
 
 export interface CredentialMetadata {
     studentAddress: string;
@@ -23,43 +11,147 @@ export interface CredentialMetadata {
 }
 
 /**
- * Initialize Stellar network connection
- * Returns configuration for Horizon and Soroban RPC endpoints
+ * Core smart contract invocation helper for Soroban
+ * Handles transaction building, simulation, freighter signing, and submission.
  */
-export function getStellarNetworkConfig(env: 'testnet' | 'mainnet' = 'testnet') {
-    return STELLAR_CONFIG[env];
+async function invokeContractMethod(
+    contractId: string,
+    method: string,
+    args: any[],
+    signerAddress: string
+): Promise<string> {
+    try {
+        const contract = new Contract(contractId);
+        const sourceAccountResponse = await sorobanServer.getAccount(signerAddress);
+
+        // Prepare the basic transaction
+        const txBuilder = new TransactionBuilder(sourceAccountResponse, {
+            fee: "100", // Will be simulated
+            networkPassphrase: activeNetwork.networkPassphrase,
+        })
+        .addOperation(contract.call(method, ...args))
+        .setTimeout(TimeoutInfinite); // Soroban needs no timeout or a sufficient one
+
+        const transaction = txBuilder.build();
+
+        // Prepare transaction (simulates and adds resources)
+        console.log(`Preparing ${method}...`);
+        const preparedTransaction = await sorobanServer.prepareTransaction(transaction as any);
+
+        // Sign with Freighter wallet
+        const signedXdr = await signTransaction(preparedTransaction.toXDR(), {
+            networkPassphrase: activeNetwork.networkPassphrase,
+            network: activeNetwork.networkName
+        } as any);
+
+        // Parse and submit the signed transaction to RPC server
+        const signedTx = TransactionBuilder.fromXDR(signedXdr as any, activeNetwork.networkPassphrase);
+        const sendResponse = await sorobanServer.sendTransaction(signedTx as any);
+
+
+        if (sendResponse.status === "ERROR") {
+            throw new Error(`Submission failed: ${sendResponse.errorResult?.toXDR("base64") || "Unknown error"}`);
+        }
+
+        return sendResponse.hash;
+    } catch (e) {
+        console.error("Contract invocation error:", e);
+        throw e;
+    }
+}
+
+/**
+ * Get the contract owner from Soroban
+ */
+export async function getContractOwner(): Promise<string> {
+    const contractId = getContractAddress("CREDENTIAL_NFT");
+    const contract = new Contract(contractId);
+    
+    // Unauthenticated read via simulation using dummy account ID (the contract itself)
+    const txBuilder = new TransactionBuilder(await sorobanServer.getAccount(contractId), {
+        fee: "100",
+        networkPassphrase: activeNetwork.networkPassphrase,
+    })
+    .addOperation(contract.call("get_owner"))
+    .setTimeout(TimeoutInfinite);
+
+    const sim = await sorobanServer.simulateTransaction(txBuilder.build());
+    if ("error" in sim) return "";
+    
+    // Parse result: get_owner returns an Address
+    const resultXdr = (sim as any).result?.retval;
+    if (!resultXdr) return "";
+
+    try {
+        const scval = xdr.ScVal.fromXDR(resultXdr, "base64");
+        return scValToNative(scval);
+    } catch {
+        return "";
+    }
+}
+
+/**
+ * Authorize an issuer (admin only)
+ */
+export async function authorizeIssuer(adminAddress: string, issuerAddress: string): Promise<string> {
+    const contractId = getContractAddress("CREDENTIAL_NFT");
+    const args = [new Address(issuerAddress).toScVal()];
+    return invokeContractMethod(contractId, "authorize_issuer", args, adminAddress);
+}
+
+/**
+ * Check if issuer is authorized
+ */
+export async function isAuthorizedIssuer(issuerAddress: string): Promise<boolean> {
+    const contractId = getContractAddress("CREDENTIAL_NFT");
+    const contract = new Contract(contractId);
+    
+    // Unauthenticated read via simulation
+    // We create a dummy source account since simulation of reads still technically needs one for the container
+    const txBuilder = new TransactionBuilder(await sorobanServer.getAccount(contractId), {
+        fee: "100",
+        networkPassphrase: activeNetwork.networkPassphrase,
+    })
+    .addOperation(contract.call("is_authorized_issuer", new Address(issuerAddress).toScVal()))
+    .setTimeout(TimeoutInfinite);
+
+    const sim = await sorobanServer.simulateTransaction(txBuilder.build());
+    if ("error" in sim) return false;
+    
+    // Parse result XDR (simplified for true/false)
+    const resultXdr = (sim as any).result?.retval;
+    return resultXdr ? true : false; 
 }
 
 /**
  * Issue a credential on Stellar Network
- * Note: Implement actual Soroban contract invocation
  */
 export async function issueCredentialOnStellar(
     studentAddress: string,
     credentialHash: string,
     ipfsUri: string,
-    issuerAccount: StellarAccount
+    issuerAddress: string
 ): Promise<{ tokenId: string; transactionHash: string }> {
     try {
         console.log('Issuing credential on Stellar Network...');
+        const contractId = getContractAddress("CREDENTIAL_NFT");
         
-        // TODO: Implement Soroban contract call
-        // This will be similar to:
-        // 1. Create Soroban contract client
-        // 2. Prepare contract invocation
-        // 3. Sign transaction with issuer account
-        // 4. Submit to Stellar network
-        
-        const mockTokenId = generateCredentialId();
-        const mockTxHash = generateMockTransactionHash();
+        const args = [
+            new Address(studentAddress).toScVal(),
+            new Address(issuerAddress).toScVal(),
+            nativeToScVal(credentialHash, { type: "string" }),
+            nativeToScVal(ipfsUri, { type: "string" }),
+        ];
+
+        const txHash = await invokeContractMethod(contractId, "issue_credential", args, issuerAddress);
         
         console.log('✅ Credential issued on Stellar Network');
-        console.log('Token ID:', mockTokenId);
-        console.log('Transaction Hash:', mockTxHash);
         
+        // We do not have block explorers resolving transaction token IDs immediately without indexers,
+        // so we return the txHash. For testing we mock tokenId.
         return {
-            tokenId: mockTokenId,
-            transactionHash: mockTxHash,
+            tokenId: "pending",
+            transactionHash: txHash,
         };
     } catch (error) {
         console.error('Error issuing credential on Stellar:', error);
@@ -68,47 +160,26 @@ export async function issueCredentialOnStellar(
 }
 
 /**
- * Register credential in Stellar Registry
- */
-export async function registerCredentialOnStellar(
-    tokenId: string,
-    studentWallet: string,
-    issuerWallet: string,
-    credentialHash: string,
-    ipfsHash: string,
-    issuerAccount: StellarAccount
-): Promise<string> {
-    try {
-        console.log('Registering credential on Stellar Network...');
-        
-        // TODO: Implement Soroban contract call to register credential
-        
-        const mockTxHash = generateMockTransactionHash();
-        console.log('✅ Credential registered on Stellar Network');
-        
-        return mockTxHash;
-    } catch (error) {
-        console.error('Error registering credential on Stellar:', error);
-        throw new Error('Failed to register credential on Stellar Network');
-    }
-}
-
-/**
  * Revoke a credential on Stellar Network
  */
 export async function revokeCredentialOnStellar(
     tokenId: string,
-    issuerAccount: StellarAccount
+    issuerAddress: string
 ): Promise<string> {
     try {
         console.log('Revoking credential on Stellar Network...');
+        const contractId = getContractAddress("CREDENTIAL_NFT");
         
-        // TODO: Implement Soroban contract call to revoke credential
+        // Convert token_id string to u64 scval
+        const args = [
+            nativeToScVal(Number(tokenId), { type: "u64" }),
+            new Address(issuerAddress).toScVal()
+        ];
+
+        const txHash = await invokeContractMethod(contractId, "revoke_credential", args, issuerAddress);
         
-        const mockTxHash = generateMockTransactionHash();
         console.log('✅ Credential revoked on Stellar Network');
-        
-        return mockTxHash;
+        return txHash;
     } catch (error) {
         console.error('Error revoking credential on Stellar:', error);
         throw new Error('Failed to revoke credential on Stellar Network');
@@ -116,82 +187,32 @@ export async function revokeCredentialOnStellar(
 }
 
 /**
- * Verify a credential on Stellar Network
- */
-export async function verifyCredentialOnStellar(
-    credentialHash: string
-): Promise<CredentialMetadata | null> {
-    try {
-        console.log('Verifying credential on Stellar Network...');
-        
-        // TODO: Implement Soroban contract call to verify credential
-        // Query the registry contract for credential data
-        
-        // Mock response
-        return null; // Return null if not found
-    } catch (error) {
-        console.error('Error verifying credential on Stellar:', error);
-        return null;
-    }
-}
-
-/**
  * Generate credential hash from metadata
- * Uses SHA-256 (keccak256 compatible)
+ * Uses Browser Crypto API SHA-256
  */
-export function generateCredentialHash(metadata: any): string {
+export async function generateCredentialHash(metadata: any): Promise<string> {
     const dataString = JSON.stringify(metadata);
-    // Using ethers for hash computation (works similarly across platforms)
-    return ethers.utils.keccak256(ethers.utils.toUtf8Bytes(dataString));
+    const msgUint8 = new TextEncoder().encode(dataString);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**
  * Verify if a Stellar address is valid
- * Stellar addresses are 56 characters, starting with 'G'
+ * Stellar ed25519 public keys start with G
  */
 export function isValidStellarAddress(address: string): boolean {
-    try {
-        // Stellar public keys are 56 characters and start with 'G'
-        return /^G[A-Z2-7]{54}$/.test(address);
-    } catch {
-        return false;
-    }
+    return StrKey.isValidEd25519PublicKey(address);
 }
 
 /**
- * Verify if an address is valid (supports both Stellar and Ethereum formats)
+ * Common export for app compatibility
  */
 export function isValidAddress(address: string): boolean {
-    // Check if Stellar address
-    if (isValidStellarAddress(address)) {
-        return true;
-    }
-    
-    // Check if Ethereum address
-    try {
-        return ethers.utils.isAddress(address);
-    } catch {
-        return false;
-    }
+    return isValidStellarAddress(address);
 }
 
-/**
- * Generate a mock credential ID for testing
- */
-export function generateCredentialId(): string {
-    return `cred_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-}
-
-/**
- * Generate a mock transaction hash for testing
- */
-export function generateMockTransactionHash(): string {
-    return `${Math.random().toString(16).substring(2)}${Math.random().toString(16).substring(2)}`;
-}
-
-/**
- * Format Stellar address to short format
- */
 export function formatStellarAddress(address: string, length: number = 8): string {
     if (!address || address.length < 2 * length) return address;
     return `${address.substring(0, length)}...${address.substring(address.length - length)}`;

@@ -9,21 +9,11 @@ import Link from 'next/link';
 import { LogOut, Shield, Users, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { useActiveAccount } from 'thirdweb/react';
-import { ConnectButton } from 'thirdweb/react';
-import { getContract, readContract } from 'thirdweb';
-import { client, stellarTestnet } from '@/lib/thirdweb';
+import { useStellarAccount } from '@/contexts/StellarContext';
+import { ConnectWallet } from '@/components/ui/ConnectWallet';
+import { getContractAddress } from '@/lib/stellar';
+import { getContractOwner } from '@/lib/contracts';
 import { toast } from 'sonner';
-
-const CREDENTIAL_NFT_ABI = [
-    {
-        inputs: [],
-        name: 'owner',
-        outputs: [{ internalType: 'address', name: '', type: 'address' }],
-        stateMutability: 'view',
-        type: 'function',
-    },
-] as const;
 
 interface AdminStats {
     totalInstitutions: number;
@@ -36,7 +26,7 @@ interface AdminStats {
 function AdminDashboardContent() {
     const { user, signOut } = useAuth();
     const router = useRouter();
-    const account = useActiveAccount();
+    const { address } = useStellarAccount();
     const [contractOwner, setContractOwner] = useState<string>('');
     const [isOwner, setIsOwner] = useState(false);
     const [isChecking, setIsChecking] = useState(true);
@@ -49,34 +39,23 @@ function AdminDashboardContent() {
     });
     const [loadingStats, setLoadingStats] = useState(true);
 
-    const contract = getContract({
-        client,
-        chain: stellarTestnet,
-        address: process.env.NEXT_PUBLIC_CREDENTIAL_NFT_CONTRACT!,
-        abi: CREDENTIAL_NFT_ABI,
-    });
-
     useEffect(() => {
         const checkOwnership = async () => {
-            if (!account?.address) {
+            if (!address) {
                 setIsChecking(false);
                 return;
             }
 
             try {
-                const owner = await readContract({
-                    contract,
-                    method: 'owner',
-                    params: [],
-                });
+                const owner = await getContractOwner();
 
-                setContractOwner(owner as string);
-                const ownerCheck = account.address.toLowerCase() === (owner as string).toLowerCase();
+                setContractOwner(owner);
+                const ownerCheck = address.toLowerCase() === owner.toLowerCase();
                 setIsOwner(ownerCheck);
 
                 if (!ownerCheck) {
                     console.log('❌ Wallet verification failed:');
-                    console.log('Your wallet:', account.address);
+                    console.log('Your wallet:', address);
                     console.log('Contract owner:', owner);
                     toast.error('⚠️ This wallet is not the contract owner');
                     toast.info('Connect the wallet that deployed the contracts');
@@ -93,7 +72,7 @@ function AdminDashboardContent() {
         };
 
         checkOwnership();
-    }, [account, router]);
+    }, [address, router]);
 
     // Fetch admin statistics
     useEffect(() => {
@@ -145,7 +124,7 @@ function AdminDashboardContent() {
         );
     }
 
-    if (!account) {
+    if (!address) {
         return (
             <div className="min-h-screen bg-linear-to-br from-gray-50 via-teal-50 to-cyan-50 flex items-center justify-center">
                 <Card className="p-8 max-w-md">
@@ -157,29 +136,7 @@ function AdminDashboardContent() {
                         Please connect your wallet to access the admin dashboard
                     </p>
                     <div className="flex justify-center">
-                        <ConnectButton
-                            client={client}
-                            chain={stellarTestnet}
-                            appMetadata={{
-                                name: 'Acredia Admin',
-                                url: 'https://acredia.app',
-                            }}
-                            theme="dark"
-                            connectButton={{
-                                label: 'Connect Wallet',
-                                style: {
-                                    background: 'linear-gradient(to right, #0d9488, #0891b2)',
-                                    color: 'white',
-                                    fontWeight: '600',
-                                    padding: '12px 24px',
-                                    borderRadius: '8px',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    fontSize: '16px',
-                                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                                },
-                            }}
-                        />
+                        <ConnectWallet />
                     </div>
                 </Card>
             </div>
@@ -203,7 +160,7 @@ function AdminDashboardContent() {
                         <p className="font-semibold text-gray-900 mb-2">Debug Information:</p>
                         <div className="space-y-1 text-gray-700">
                             <p><strong>Your Wallet:</strong></p>
-                            <p className="font-mono text-xs break-all">{account?.address}</p>
+                            <p className="font-mono text-xs break-all">{address}</p>
                             <p className="mt-2"><strong>Contract Owner:</strong></p>
                             <p className="font-mono text-xs break-all">{contractOwner}</p>
                         </div>
@@ -213,38 +170,16 @@ function AdminDashboardContent() {
                         Please connect the wallet that deployed the contracts to access admin features.
                     </p>
                     <div className="space-y-2">
-                        <div className="flex justify-center">
-                            <ConnectButton
-                                client={client}
-                                chain={stellarTestnet}
-                                appMetadata={{
-                                    name: 'Acredia Admin',
-                                    url: 'https://acredia.app',
-                                }}
-                                theme="dark"
-                                connectButton={{
-                                    label: 'Connect Wallet',
-                                    style: {
-                                        background: 'linear-gradient(to right, #0d9488, #0891b2)',
-                                        color: 'white',
-                                        fontWeight: '600',
-                                        padding: '12px 24px',
-                                        borderRadius: '8px',
-                                        border: 'none',
-                                        cursor: 'pointer',
-                                        width: '100%',
-                                        fontSize: '16px',
-                                    },
-                                }}
-                            />
+                        <div className="flex justify-center flex-col gap-2">
+                            <ConnectWallet />
+                            <Button
+                                onClick={() => router.push('/dashboard')}
+                                variant="outline"
+                                className="w-full"
+                            >
+                                Go to Dashboard
+                            </Button>
                         </div>
-                        <Button
-                            onClick={() => router.push('/dashboard')}
-                            variant="outline"
-                            className="w-full"
-                        >
-                            Go to Dashboard
-                        </Button>
                     </div>
                 </Card>
             </div>
@@ -275,28 +210,7 @@ function AdminDashboardContent() {
                             </div>
                         </Link>
                         <div className="flex items-center space-x-4">
-                            <ConnectButton
-                                client={client}
-                                chain={stellarTestnet}
-                                appMetadata={{
-                                    name: 'Acredia Admin',
-                                    url: 'https://acredia.app',
-                                }}
-                                theme="dark"
-                                connectButton={{
-                                    label: 'Connect Wallet',
-                                    style: {
-                                        background: 'linear-gradient(to right, #0d9488, #0891b2)',
-                                        color: 'white',
-                                        fontWeight: '600',
-                                        padding: '8px 16px',
-                                        borderRadius: '8px',
-                                        border: 'none',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s',
-                                    },
-                                }}
-                            />
+                            <ConnectWallet />
                             <Button
                                 onClick={handleSignOut}
                                 variant="ghost"
@@ -340,7 +254,7 @@ function AdminDashboardContent() {
                                 <div>
                                     <p className="text-sm text-red-700 font-medium">Wallet Address:</p>
                                     <p className="text-xs font-mono text-red-800 break-all">
-                                        {account.address}
+                                        {address}
                                     </p>
                                 </div>
                                 <div>

@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { uploadToIPFS, uploadJSONToIPFS, getIPFSUrl } from './ipfs';
-import { issueCredentialNFT, registerCredential, generateCredentialHash, revokeCredential, getCredentialIssuer } from './contracts';
+import { issueCredentialOnStellar, generateCredentialHash, revokeCredentialOnStellar } from './contracts';
 
 export interface Subject {
     id: string;
@@ -64,7 +64,7 @@ export interface CredentialMetadata {
  */
 export async function issueCredential(
     data: CredentialData,
-    account: any
+    issuerAddress: string
 ): Promise<{
     tokenId: string;
     transactionHash: string;
@@ -146,35 +146,21 @@ export async function issueCredential(
 
         // Step 3: Generate credential hash
         console.log('🔐 Generating credential hash...');
-        const credentialHash = generateCredentialHash(metadata);
+        const credentialHash = await generateCredentialHash(metadata);
         console.log('✅ Hash generated:', credentialHash);
 
         // Step 4: Mint NFT on blockchain
-        console.log('⛓️ Minting NFT on blockchain...');
-        const { tokenId, transactionHash } = await issueCredentialNFT(
+        console.log('⛓️ Issuing credential on Stellar network...');
+        const { tokenId, transactionHash } = await issueCredentialOnStellar(
             data.studentWallet,
             credentialHash,
             metadataUrl,
-            account
+            issuerAddress
         );
-        console.log('✅ NFT minted! Token ID:', tokenId);
+        console.log('✅ Credential issued! Token ID:', tokenId);
         console.log('✅ Transaction:', transactionHash);
 
-        // Step 5: Register in credential registry
-        try {
-            console.log('📝 Registering in credential registry...');
-            await registerCredential(
-                tokenId,
-                data.studentWallet,
-                data.institutionWallet,
-                credentialHash,
-                metadataPath,
-                account
-            );
-            console.log('✅ Registered in registry');
-        } catch (error) {
-            console.warn('⚠️ Registry registration failed (non-critical):', error);
-        }
+        // Step 5: (Skipped) Registry handled atomically by Stellar contract
 
         // Step 6: Save to Supabase database
         console.log('💾 Saving to database...');
@@ -261,7 +247,7 @@ export async function getCredentialById(credentialId: string) {
  */
 export async function revokeCredentialById(
     credentialId: string,
-    account: any
+    issuerAddress: string
 ): Promise<void> {
     try {
         // Get credential from database
@@ -275,54 +261,29 @@ export async function revokeCredentialById(
         }
 
         // Validate wallet authorization
-        const connectedWallet = account?.address?.toLowerCase();
-        const issuerWallet = credential.issuer_wallet_address?.toLowerCase();
+        const connectedWallet = issuerAddress?.toLowerCase();
+        const storedIssuerWallet = credential.issuer_wallet_address?.toLowerCase();
 
         console.log('🔐 Validating wallet authorization...');
         console.log('Connected wallet:', connectedWallet);
-        console.log('Issuer wallet:', issuerWallet);
+        console.log('Issuer wallet:', storedIssuerWallet);
 
         if (!connectedWallet) {
             throw new Error('No wallet connected. Please connect your wallet first.');
         }
 
-        if (connectedWallet !== issuerWallet) {
+        if (connectedWallet !== storedIssuerWallet) {
             throw new Error(
                 `Authorization failed: You must use the same wallet that issued this credential.\n` +
-                `Expected: ${issuerWallet}\n` +
+                `Expected: ${storedIssuerWallet}\n` +
                 `Connected: ${connectedWallet}`
             );
         }
 
-        // Revoke on blockchain (requires token_id)
+        // Revoke on blockchain
         if (credential.token_id) {
-            console.log('⛓️ Revoking credential on blockchain...');
-
-            // Check who is stored as issuer on blockchain
-            try {
-                const blockchainIssuer = await getCredentialIssuer(credential.token_id);
-                console.log('📋 Blockchain stored issuer:', blockchainIssuer);
-                console.log('📋 Connected wallet:', connectedWallet);
-
-                if (blockchainIssuer.toLowerCase() !== connectedWallet) {
-                    throw new Error(
-                        `Blockchain authorization mismatch!\n` +
-                        `The blockchain has a different issuer stored for this credential.\n` +
-                        `Blockchain issuer: ${blockchainIssuer}\n` +
-                        `Connected wallet: ${connectedWallet}\n\n` +
-                        `Please use the wallet: ${blockchainIssuer}\n` +
-                        `Or use the contract owner wallet to revoke.`
-                    );
-                }
-            } catch (err: any) {
-                if (err.message?.includes('Blockchain authorization mismatch')) {
-                    throw err;
-                }
-                console.warn('Could not verify blockchain issuer:', err);
-            }
-
-            await revokeCredential(credential.token_id, account);
-            console.log('✅ Credential revoked on blockchain');
+            await revokeCredentialOnStellar(credential.token_id, issuerAddress);
+            console.log('✅ Credential revoked on Stellar network');
         }
 
         // Update in database

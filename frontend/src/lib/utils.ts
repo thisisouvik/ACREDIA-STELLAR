@@ -34,9 +34,9 @@ export function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
-// Validate Ethereum address
+// Validate Stellar address
 export function isValidAddress(address: string): boolean {
-  return /^0x[a-fA-F0-9]{40}$/.test(address);
+  return /^G[A-Z2-7]{54}$/.test(address);
 }
 
 // Convert file to base64

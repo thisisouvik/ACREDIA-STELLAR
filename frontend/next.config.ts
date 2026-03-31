@@ -42,7 +42,7 @@ const nextConfig: NextConfig = {
     return config;
   },
 
-  transpilePackages: ['thirdweb'],
+
 
   experimental: {
     // Optimize package imports

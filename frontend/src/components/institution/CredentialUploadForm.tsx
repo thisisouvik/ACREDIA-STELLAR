@@ -23,7 +23,7 @@ interface CredentialUploadFormProps {
     institutionId: string;
     institutionName: string;
     institutionWallet: string;
-    account: any;
+    account: string | null;
     onSuccess?: () => void;
 }
 

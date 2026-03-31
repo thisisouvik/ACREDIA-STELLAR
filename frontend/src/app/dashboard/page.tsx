@@ -11,9 +11,8 @@ import Link from 'next/link';
 import { LogOut, Wallet, Upload, List, User, Shield } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { useActiveAccount } from 'thirdweb/react';
-import { ConnectButton } from 'thirdweb/react';
-import { client, stellarTestnet } from '@/lib/thirdweb';
+import { useStellarAccount } from '@/contexts/StellarContext';
+import { ConnectWallet } from '@/components/ui/ConnectWallet';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 
@@ -22,7 +21,7 @@ import StudentCredentialsList from '@/components/student/StudentCredentialsList'
 function DashboardContent() {
     const { user, userRole, signOut } = useAuth();
     const router = useRouter();
-    const account = useActiveAccount();
+    const { address } = useStellarAccount();
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     const [institutionId, setInstitutionId] = useState<string>('');
     const [loading, setLoading] = useState(true);
@@ -94,7 +93,7 @@ function DashboardContent() {
 
     // Get institution data from user metadata
     const institutionName = user?.user_metadata?.name || 'Institution';
-    const institutionWallet = account?.address || '';
+    const institutionWallet = address || '';
 
     return (
         <div className="min-h-screen bg-linear-to-br from-gray-50 via-teal-50 to-cyan-50">
@@ -115,28 +114,7 @@ function DashboardContent() {
                             </span>
                         </Link>
                         <div className="flex items-center space-x-4">
-                            <ConnectButton
-                                client={client}
-                                chain={stellarTestnet}
-                                appMetadata={{
-                                    name: 'Acredia',
-                                    url: 'https://acredia.app',
-                                }}
-                                theme="dark"
-                                connectButton={{
-                                    label: 'Connect Wallet',
-                                    style: {
-                                        background: 'linear-gradient(to right, #0d9488, #0891b2)',
-                                        color: 'white',
-                                        fontWeight: '600',
-                                        padding: '8px 16px',
-                                        borderRadius: '8px',
-                                        border: 'none',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s',
-                                    },
-                                }}
-                            />
+                            <ConnectWallet />
                             <Button
                                 onClick={handleSignOut}
                                 variant="ghost"
@@ -192,10 +170,10 @@ function DashboardContent() {
                                     <div>
                                         <p className="text-sm text-gray-500">Wallet Status</p>
                                         <p className="text-gray-900 font-medium">
-                                            {account ? (
+                                            {address ? (
                                                 <span className="text-teal-600">
-                                                    Connected: {account.address.slice(0, 6)}...
-                                                    {account.address.slice(-4)}
+                                                    Connected: {address.slice(0, 6)}...
+                                                    {address.slice(-4)}
                                                 </span>
                                             ) : (
                                                 <span className="text-orange-600">Not Connected</span>
@@ -207,7 +185,7 @@ function DashboardContent() {
                         )}
 
                         {/* Wallet Connection Warning */}
-                        {institutionId && !account && (
+                        {institutionId && !address && (
                             <Card className="border-orange-200 bg-orange-50 p-6">
                                 <div className="flex items-start space-x-3">
                                     <Wallet className="h-6 w-6 text-orange-600 mt-1" />
@@ -243,7 +221,7 @@ function DashboardContent() {
                                         institutionId={institutionId}
                                         institutionName={institutionName}
                                         institutionWallet={institutionWallet}
-                                        account={account}
+                                        account={address}
                                         onSuccess={handleCredentialIssued}
                                     />
                                 </TabsContent>
@@ -279,10 +257,10 @@ function DashboardContent() {
                                 <div>
                                     <p className="text-sm text-gray-500">Wallet Status</p>
                                     <p className="text-gray-900 font-medium">
-                                        {account ? (
+                                        {address ? (
                                             <span className="text-teal-600">
-                                                Connected: {account.address.slice(0, 6)}...
-                                                {account.address.slice(-4)}
+                                                Connected: {address.slice(0, 6)}...
+                                                {address.slice(-4)}
                                             </span>
                                         ) : (
                                             <span className="text-orange-600">Not Connected</span>
@@ -293,7 +271,7 @@ function DashboardContent() {
                         </Card>
 
                         {/* Wallet Connection Warning */}
-                        {!account && (
+                        {!address && (
                             <Card className="border-orange-200 bg-orange-50 p-6">
                                 <div className="flex items-start space-x-3">
                                     <Wallet className="h-6 w-6 text-orange-600 mt-1" />
@@ -313,7 +291,7 @@ function DashboardContent() {
                         {/* Student Credentials List */}
                         <StudentCredentialsList
                             studentId={user?.id || ''}
-                            studentWallet={account?.address}
+                            studentWallet={address || undefined}
                         />
                     </div>
                 )}
