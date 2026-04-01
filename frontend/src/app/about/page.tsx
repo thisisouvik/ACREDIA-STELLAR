@@ -501,10 +501,10 @@ export default function AboutPage() {
                                 Soulbound NFTs
                             </h3>
                             <p className="text-gray-600 leading-relaxed mb-4">
-                                Non-transferable ERC-721 token credentials permanently bound to student wallets,
-                                ensuring true ownership and preventing fraud or resale.
+                                Non-transferable Soroban-based credential tokens permanently bound to student
+                                Stellar addresses, ensuring true ownership and preventing fraud or resale.
                             </p>
-                            <div className="text-sm font-semibold text-teal-600">ERC-721 Standard</div>
+                            <div className="text-sm font-semibold text-teal-600">Soroban / Stellar Network</div>
                         </Card>
 
                         <Card className="border border-gray-200 p-8 text-center hover:shadow-xl transition-all">
@@ -555,7 +555,7 @@ export default function AboutPage() {
                                 <CloudUpload className="w-10 h-10 mb-4" />
                                 <h3 className="text-xl font-bold mb-3">IPFS Storage</h3>
                                 <p className="text-teal-50">
-                                    Credentials stored on InterPlanetary File System (IPFS) via Thirdweb Storage,
+                                    Credentials stored on InterPlanetary File System (IPFS) via Pinata,
                                     ensuring decentralized, permanent, and censorship-resistant storage.
                                 </p>
                             </div>
@@ -564,17 +564,17 @@ export default function AboutPage() {
                                 <Coins className="w-10 h-10 mb-4" />
                                 <h3 className="text-xl font-bold mb-3">Smart Contracts</h3>
                                 <p className="text-teal-50">
-                                    Two primary contracts: CredentialNFT (ERC-721) for token minting and
-                                    CredentialRegistry for metadata management and access control.
+                                    Single unified AcrediaCredential Soroban contract handles credential issuance,
+                                    authorization, and revocation — all in one Rust-powered smart contract.
                                 </p>
                             </div>
 
                             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
                                 <Lock className="w-10 h-10 mb-4" />
-                                <h3 className="text-xl font-bold mb-3">Sepolia Testnet</h3>
+                                <h3 className="text-xl font-bold mb-3">Stellar Testnet</h3>
                                 <p className="text-teal-50">
-                                    Currently deployed on Ethereum Sepolia testnet (Chain ID: 11155111) with
-                                    plans for mainnet migration and Layer 2 scaling solutions.
+                                    Deployed on Stellar Testnet via Soroban — ultra-low fees (~0.001 XLM per
+                                    transaction) with 5-second finality and mainnet-ready architecture.
                                 </p>
                             </div>
 

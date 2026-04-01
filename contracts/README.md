@@ -284,6 +284,6 @@ For issues or questions:
 
 ```
 
-## Join our Discord!
+## Questions & Support
 
-For any questions, suggestions, join our discord at [https://discord.gg/thirdweb](https://discord.gg/thirdweb).
+For any questions or suggestions, open an issue on the [GitHub repository](https://github.com/sumanpradhan1706/ACREDIA-STELLAR) or refer to the [Stellar Developers documentation](https://developers.stellar.org/).

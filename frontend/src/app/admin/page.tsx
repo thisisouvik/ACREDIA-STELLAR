@@ -47,7 +47,7 @@ function AdminDashboardContent() {
             }
 
             try {
-                const owner = await getContractOwner();
+                const owner = await getContractOwner(address);
 
                 setContractOwner(owner);
                 const ownerCheck = address.toLowerCase() === owner.toLowerCase();
@@ -143,48 +143,7 @@ function AdminDashboardContent() {
         );
     }
 
-    if (!isOwner) {
-        return (
-            <div className="min-h-screen bg-linear-to-br from-gray-50 via-teal-50 to-cyan-50 flex items-center justify-center">
-                <Card className="p-8 max-w-lg border-red-200">
-                    <Shield className="h-16 w-16 text-red-600 mx-auto mb-4" />
-                    <h2 className="text-2xl font-bold text-gray-900 text-center mb-4">
-                        Connect Contract Owner Wallet
-                    </h2>
-                    <p className="text-gray-600 text-center mb-4">
-                        The connected wallet is not the contract owner.
-                    </p>
 
-                    {/* Debug Info */}
-                    <div className="bg-gray-100 rounded-lg p-4 mb-4 text-sm">
-                        <p className="font-semibold text-gray-900 mb-2">Debug Information:</p>
-                        <div className="space-y-1 text-gray-700">
-                            <p><strong>Your Wallet:</strong></p>
-                            <p className="font-mono text-xs break-all">{address}</p>
-                            <p className="mt-2"><strong>Contract Owner:</strong></p>
-                            <p className="font-mono text-xs break-all">{contractOwner}</p>
-                        </div>
-                    </div>
-
-                    <p className="text-sm text-gray-500 text-center mb-6">
-                        Please connect the wallet that deployed the contracts to access admin features.
-                    </p>
-                    <div className="space-y-2">
-                        <div className="flex justify-center flex-col gap-2">
-                            <ConnectWallet />
-                            <Button
-                                onClick={() => router.push('/dashboard')}
-                                variant="outline"
-                                className="w-full"
-                            >
-                                Go to Dashboard
-                            </Button>
-                        </div>
-                    </div>
-                </Card>
-            </div>
-        );
-    }
 
     return (
         <div className="min-h-screen bg-linear-to-br from-gray-50 via-teal-50 to-cyan-50">
@@ -237,6 +196,24 @@ function AdminDashboardContent() {
                         Manage institution authorizations and system settings
                     </p>
                 </div>
+
+                {!isOwner && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                        <div className="flex items-start space-x-3">
+                            <Shield className="h-6 w-6 text-red-600 mt-0.5" />
+                            <div>
+                                <h3 className="text-sm font-bold text-red-900 mb-1">
+                                    Read-Only Mode: Not Contract Owner
+                                </h3>
+                                <p className="text-xs text-red-700 mt-1">
+                                    You are viewing the dashboard, but you cannot authorize new institutions because your currently connected wallet ({address?.slice(0, 6)}...{address?.slice(-4)}) is not the contract owner.
+                                    <br />
+                                    Actual Owner: <span className="font-mono bg-red-100 px-1 rounded">{contractOwner || 'Could not fetch'}</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Admin Info Card */}
                 <Card className="border-red-200 bg-red-50 p-6 mb-6">

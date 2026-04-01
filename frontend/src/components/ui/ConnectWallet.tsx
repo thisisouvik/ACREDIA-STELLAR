@@ -2,22 +2,38 @@
 
 import { useStellarAccount } from '@/contexts/StellarContext';
 import { Button } from './button';
-import { Wallet } from 'lucide-react';
+import { Wallet, Copy, LogOut } from 'lucide-react';
+
+import { toast } from 'sonner';
 
 export function ConnectWallet() {
     const { address, isConnecting, connect, disconnect } = useStellarAccount();
 
     if (address) {
         return (
-            <Button 
-                onClick={disconnect} 
-                variant="outline" 
-                className="border-teal-600 text-teal-600 hover:bg-red-50 hover:text-red-700 hover:border-red-600 transition-colors"
-                title="Disconnect Wallet"
-            >
-                <Wallet className="h-4 w-4 mr-2" />
-                {address.slice(0, 5)}...{address.slice(-4)}
-            </Button>
+            <div className="flex items-center rounded-md border border-teal-600 bg-white shadow-sm overflow-hidden h-10">
+                <Button 
+                    variant="ghost"
+                    className="rounded-none border-r border-teal-200 text-teal-700 hover:bg-teal-50 h-full px-3 font-mono text-sm"
+                    onClick={() => {
+                        navigator.clipboard.writeText(address);
+                        toast.success('Wallet address copied!');
+                    }}
+                    title="Copy Address"
+                >
+                    <Wallet className="h-4 w-4 mr-2 text-teal-600" />
+                    {address.slice(0, 5)}...{address.slice(-4)}
+                    <Copy className="h-3 w-3 ml-2 text-teal-400 opacity-70" />
+                </Button>
+                <Button 
+                    onClick={disconnect} 
+                    variant="ghost" 
+                    className="rounded-none text-red-500 hover:text-red-700 hover:bg-red-50 h-full px-3"
+                    title="Disconnect Wallet"
+                >
+                    <LogOut className="h-4 w-4" />
+                </Button>
+            </div>
         );
     }
 

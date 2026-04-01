@@ -552,9 +552,10 @@ NEXT_PUBLIC_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
-# IPFS / Thirdweb Storage
-NEXT_PUBLIC_THIRDWEB_CLIENT_ID=your_thirdweb_client_id
-NEXT_PUBLIC_NFT_STORAGE_KEY=your_thirdweb_storage_key
+# Pinata IPFS (get free JWT at https://pinata.cloud)
+NEXT_PUBLIC_PINATA_JWT=your_pinata_jwt_token
+# Optional: custom Pinata gateway domain
+# NEXT_PUBLIC_PINATA_GATEWAY=https://your-gateway.mypinata.cloud
 ```
 
 Create a `.env` file in the `contracts` directory:
@@ -660,12 +661,18 @@ pnpm start
 
 ### Getting API Keys
 
-#### Thirdweb Client ID
+#### Pinata IPFS Setup
 
-1. Visit [Thirdweb Dashboard](https://thirdweb.com/dashboard)
-2. Create a new project
-3. Copy your Client ID
-4. Configure for multi-chain support
+1. Visit [Pinata](https://pinata.cloud) and sign up for free (no credit card required)
+2. Go to **API Keys** → **New Key**
+3. Enable `pinFileToIPFS` and `pinJSONToIPFS` permissions
+4. Copy the **JWT** token
+5. Add to your `.env.local`:
+   ```env
+   NEXT_PUBLIC_PINATA_JWT=eyJhbGci...
+   ```
+
+> **Free tier**: 1 GB storage, unlimited pins — more than enough for development and testing.
 
 #### Supabase Setup
 
@@ -682,20 +689,14 @@ pnpm start
 
 1. Create Stellar account using Stellar CLI:
    ```bash
-   soroban config identity generate --name admin
+   stellar keys generate --network testnet admin
    ```
 2. Fund your account with test XLM:
    ```bash
-   soroban config identity fund --identity admin
+   stellar keys fund admin --network testnet
    ```
-3. Get your public key: `soroban config identity address --name admin`
+3. Get your public key: `stellar keys address admin`
 4. For testnet, fund from [Stellar Testnet Faucet](https://laboratory.stellar.org/)
-
-#### NFT.Storage / Thirdweb Storage
-
-1. Visit [Thirdweb Storage](https://thirdweb.com/storage) (recommended)
-2. Or use [NFT.Storage](https://nft.storage/) as alternative
-3. Generate API token for IPFS uploads
 
 ### Wallet Setup for Stellar Network
 
@@ -872,7 +873,7 @@ frontend/
 │   │   ├── credentialService.ts   # Credential issuance service
 │   │   ├── ipfs.ts                # IPFS upload utilities
 │   │   ├── supabase.ts            # Supabase client
-│   │   ├── thirdweb.ts            # Thirdweb configuration
+│   │   ├── stellar.ts             # Stellar/Soroban configuration
 │   │   └── utils.ts               # Utility functions
 │   └── types/
 │       └── index.ts               # TypeScript type definitions
@@ -1098,11 +1099,12 @@ pnpm test
 - Ensure sufficient XLM balance for deployment
 - Check Soroban SDK version compatibility in Cargo.toml
 
-**Problem: IPFS upload timeout**
+**Problem: IPFS upload timeout / failed**
 
-- Solution: Check internet connection or try again later
-- Verify Thirdweb client ID is valid
-- Consider using alternative IPFS gateway
+- Ensure `NEXT_PUBLIC_PINATA_JWT` is set in your `.env.local`
+- Verify the JWT is valid at [app.pinata.cloud](https://app.pinata.cloud)
+- Check your internet connection and try again
+- Free tier is limited to 1 GB — check your Pinata dashboard usage
 
 **Problem: Verification page shows "not found"**
 

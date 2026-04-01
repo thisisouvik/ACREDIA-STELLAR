@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 interface AuthContextType {
     user: User | null;
     loading: boolean;
-    userRole: 'institution' | 'student' | null;
+    userRole: 'institution' | 'student' | 'admin' | null;
     signOut: () => Promise<void>;
 }
 
@@ -22,7 +22,7 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
-    const [userRole, setUserRole] = useState<'institution' | 'student' | null>(null);
+    const [userRole, setUserRole] = useState<'institution' | 'student' | 'admin' | null>(null);
 
     useEffect(() => {
         // Check active sessions
@@ -78,7 +78,7 @@ export function ProtectedRoute({
     allowedRoles,
 }: {
     children: React.ReactNode;
-    allowedRoles?: ('institution' | 'student')[];
+    allowedRoles?: ('institution' | 'student' | 'admin')[];
 }) {
     const { user, loading, userRole } = useAuth();
     const router = useRouter();

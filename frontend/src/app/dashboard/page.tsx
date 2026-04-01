@@ -237,6 +237,41 @@ function DashboardContent() {
                     </div>
                 )}
 
+                {/* Admin Dashboard — redirect to /admin */}
+                {userRole === 'admin' && (
+                    <div className="space-y-6">
+                        <Card className="border-red-200 bg-gradient-to-br from-red-50 to-orange-50 p-8 shadow-lg">
+                            <div className="flex items-center space-x-4 mb-6">
+                                <div className="bg-red-100 p-3 rounded-2xl">
+                                    <Shield className="h-10 w-10 text-red-600" />
+                                </div>
+                                <div>
+                                    <h2 className="text-2xl font-bold text-gray-900">You&apos;re an Admin</h2>
+                                    <p className="text-gray-600">Access the Admin Panel to manage institutions and authorize issuers.</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Link href="/admin">
+                                    <div className="bg-white border border-red-200 rounded-xl p-6 hover:shadow-md hover:border-red-400 transition-all cursor-pointer group">
+                                        <Shield className="h-8 w-8 text-red-600 mb-3 group-hover:scale-110 transition-transform" />
+                                        <h3 className="font-bold text-gray-900 mb-1">Admin Dashboard</h3>
+                                        <p className="text-sm text-gray-600">Authorize institutions, view system stats, and manage the contract.</p>
+                                        <span className="text-xs text-red-600 font-semibold mt-2 inline-block">Open Admin Panel →</span>
+                                    </div>
+                                </Link>
+                                <div className="bg-white border border-gray-200 rounded-xl p-6">
+                                    <User className="h-8 w-8 text-teal-600 mb-3" />
+                                    <h3 className="font-bold text-gray-900 mb-1">Connected Wallet</h3>
+                                    <p className="text-sm text-gray-500 mb-2">Your Stellar address:</p>
+                                    <p className="text-xs font-mono text-gray-700 break-all">
+                                        {address || <span className="text-orange-500">Not connected — click &quot;Connect Wallet&quot; above</span>}
+                                    </p>
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+                )}
+
                 {/* Student Dashboard */}
                 {userRole === 'student' && (
                     <div className="space-y-6">

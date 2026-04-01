@@ -21,15 +21,18 @@ export function AuthorizeIssuer() {
     // Load contract owner on mount
     useEffect(() => {
         const loadOwner = async () => {
+            if (!address) return;
             try {
-                const owner = await getContractOwner();
+                const owner = await getContractOwner(address);
                 setContractOwner(owner);
             } catch (error) {
                 console.error('Error loading contract owner:', error);
             }
         };
-        loadOwner();
-    }, []);
+        if (address) {
+            loadOwner();
+        }
+    }, [address]);
 
     const checkAuthorization = async (addressToCheck = walletToAuthorize) => {
         if (!addressToCheck) {
@@ -40,7 +43,7 @@ export function AuthorizeIssuer() {
         setIsChecking(true);
         try {
             // Check if address is authorized
-            const isInMapping = await isAuthorizedIssuer(addressToCheck);
+            const isInMapping = await isAuthorizedIssuer(addressToCheck, address || '');
             const isOwner = addressToCheck.toLowerCase() === contractOwner?.toLowerCase();
             const isAuthorizedResult = isInMapping || isOwner;
 
@@ -202,19 +205,19 @@ export function AuthorizeIssuer() {
                     <Label htmlFor="walletAddress">Wallet Address to Authorize</Label>
                     <Input
                         id="walletAddress"
-                        placeholder="0x..."
+                        placeholder="G..."
                         value={walletToAuthorize}
                         onChange={(e) => setWalletToAuthorize(e.target.value)}
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                        Enter the wallet address that should be authorized to issue credentials
+                        Enter the Stellar public key (`G...`) that should be authorized to issue credentials
                     </p>
                 </div>
 
                 <div className="flex space-x-3">
                     <Button
                         onClick={handleAuthorizeWallet}
-                        disabled={isAuthorizing || !walletToAuthorize || !address}
+                        disabled={isAuthorizing || !walletToAuthorize || !address || address.toLowerCase() !== contractOwner?.toLowerCase()}
                         className="flex-1 bg-linear-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white"
                     >
                         {isAuthorizing ? 'Authorizing...' : 'Authorize Wallet'}
