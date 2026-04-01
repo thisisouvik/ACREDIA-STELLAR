@@ -1,0 +1,24 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Dependencies
+node_modules/
+/target/
+
+# IDE/Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Stellar / Soroban
+.soroban/
+
+# Temporary files
+*.log
