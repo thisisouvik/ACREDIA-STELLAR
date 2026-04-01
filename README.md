@@ -1,8 +1,7 @@
-# ACREDIA
-
 <div align="center">
-  <img src="frontend/public/logo.png" alt="Acredia Logo" width="150" />
+  <img src="frontend/public/Acredia.png" alt="Acredia Logo" width="150" />
   
+  # ACREDIA
   ### Blockchain-Based Academic Credential Verification System
   
   *Secure, Transparent, and Tamper-Proof Educational Credentials on Stellar Network*
