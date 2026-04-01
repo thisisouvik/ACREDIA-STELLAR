@@ -13,6 +13,10 @@ soroban-sdk = { version = "20.3.0", features = ["testutils"] }
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+# Suppress false-positive cfg warnings from Soroban SDK macros (testutils feature gate)
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(feature, values("testutils"))'] }
+
 [profile.release-with-logs]
 inherits = "release"
 debug-assertions = true
