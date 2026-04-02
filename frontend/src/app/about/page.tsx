@@ -741,7 +741,7 @@ export default function AboutPage() {
                         <div>
                             <div className="flex items-center space-x-3 mb-4">
                                 <Image
-                                    src="/logo.png"
+                                    src="/Acredia.png"
                                     alt="Acredia Logo"
                                     width={32}
                                     height={32}

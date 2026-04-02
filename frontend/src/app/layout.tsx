@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   title: "Acredia - Blockchain Academic Credentials",
   description: "Secure, tamper-proof academic credentials powered by blockchain",
   icons: {
-    icon: "/logo.png",
+    icon: "/Acredia.png",
   },
 };
 
