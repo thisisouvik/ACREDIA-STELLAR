@@ -64,7 +64,7 @@ Traditional paper-based or centralized digital credentials suffer from:
 Acredia solves these problems by creating **immutable, blockchain-verified credentials** that are:
 
 - ✅ Permanent and tamper-proof
-- ✅ Instantly verifiable
+- ✅ lntly verifiable
 - ✅ Decentralized and censorship-resistant
 - ✅ Accessible anywhere, anytime
 - ✅ Privacy-preserving with student control
@@ -520,8 +520,8 @@ Before you begin, ensure you have the following installed:
 1. **Clone the Repository**
 
 ```powershell
-git clone https://github.com/thisisouvik/Arcedia.git
-cd Arcedia
+git clone https://github.com/Sumanpradhan1706/ACREDIA-STELLAR.git
+cd ACREDIA-STELLAR
 ```
 
 2. **Install Frontend Dependencies**
@@ -1072,7 +1072,7 @@ pnpm test
 
 - [ ] Credential revocation UI
 - [ ] Decentralized identity (DID) integration
-- [ ] Mobile application
+- [ ] Mobile ins
 - [ ] API for third-party integrations
 - [ ] Analytics dashboard
 - [ ] Cross-chain credential verification

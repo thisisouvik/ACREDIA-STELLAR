@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
-import { supabase, signOut } from '@/lib/supabase';
+import { supabase, signOut, safeGetSession } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
 interface AuthContextType {
@@ -26,9 +26,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         // Check active sessions
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        safeGetSession().then(({ data: { session } }) => {
             setUser(session?.user ?? null);
             setUserRole(session?.user?.user_metadata?.role ?? null);
+            setLoading(false);
+        }).catch(() => {
+            setUser(null);
+            setUserRole(null);
             setLoading(false);
         });
 

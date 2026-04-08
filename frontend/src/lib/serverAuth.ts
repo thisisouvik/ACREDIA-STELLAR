@@ -1,0 +1,113 @@
+import { createClient } from '@supabase/supabase-js';
+import type { NextRequest } from 'next/server';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+function getBearerToken(request: NextRequest): string | null {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) return null;
+
+    const [scheme, token] = authHeader.split(' ');
+    if (scheme?.toLowerCase() !== 'bearer' || !token) {
+        return null;
+    }
+
+    return token;
+}
+
+function hasRequiredEnv(): boolean {
+    return Boolean(supabaseUrl && supabaseAnonKey && supabaseServiceRoleKey);
+}
+
+function createAnonClient() {
+    if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error('Missing Supabase public environment variables');
+    }
+
+    return createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+        },
+    });
+}
+
+function createServiceRoleClient() {
+    if (!supabaseUrl || !supabaseServiceRoleKey) {
+        throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY');
+    }
+
+    return createClient(supabaseUrl, supabaseServiceRoleKey, {
+        auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+        },
+    });
+}
+
+export async function requireAdminRequest(request: NextRequest): Promise<
+    | { ok: true; userId: string }
+    | { ok: false; status: number; error: string }
+> {
+    if (!hasRequiredEnv()) {
+        return {
+            ok: false,
+            status: 500,
+            error: 'Server configuration error',
+        };
+    }
+
+    const token = getBearerToken(request);
+    if (!token) {
+        return {
+            ok: false,
+            status: 401,
+            error: 'Missing access token',
+        };
+    }
+
+    const anonClient = createAnonClient();
+    const { data: authData, error: authError } = await anonClient.auth.getUser(token);
+
+    if (authError || !authData.user) {
+        return {
+            ok: false,
+            status: 401,
+            error: 'Invalid or expired access token',
+        };
+    }
+
+    const serviceClient = createServiceRoleClient();
+    const { data: profile, error: profileError } = await serviceClient
+        .from('profiles')
+        .select('role')
+        .eq('id', authData.user.id)
+        .maybeSingle();
+
+    if (profileError) {
+        return {
+            ok: false,
+            status: 500,
+            error: 'Failed to resolve user role',
+        };
+    }
+
+    if (!profile || profile.role !== 'admin') {
+        return {
+            ok: false,
+            status: 403,
+            error: 'Admin access required',
+        };
+    }
+
+    return {
+        ok: true,
+        userId: authData.user.id,
+    };
+}
+
+export function getServiceRoleClient() {
+    return createServiceRoleClient();
+}

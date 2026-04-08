@@ -14,6 +14,43 @@ export const supabase = createClient(
     supabaseAnonKey || 'placeholder'
 );
 
+function isInvalidRefreshTokenError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+        return false;
+    }
+
+    const message = 'message' in error ? String((error as { message?: string }).message || '') : '';
+    return message.includes('Invalid Refresh Token') || message.includes('Refresh Token Not Found');
+}
+
+async function clearLocalAuthSession() {
+    try {
+        await supabase.auth.signOut({ scope: 'local' });
+    } catch {
+        // Ignore cleanup failures; the local session state is already invalid.
+    }
+}
+
+export async function safeGetSession() {
+    try {
+        const { data, error } = await supabase.auth.getSession();
+
+        if (error && isInvalidRefreshTokenError(error)) {
+            await clearLocalAuthSession();
+            return { data: { session: null }, error: null };
+        }
+
+        return { data, error };
+    } catch (error) {
+        if (isInvalidRefreshTokenError(error)) {
+            await clearLocalAuthSession();
+            return { data: { session: null }, error: null };
+        }
+
+        throw error;
+    }
+}
+
 // Direct exports for easier imports
 export async function signUp(email: string, password: string, options?: { data?: any }) {
     const { data, error } = await supabase.auth.signUp({
@@ -84,7 +121,7 @@ export const authHelpers = {
     },
 
     async getSession() {
-        const { data, error } = await supabase.auth.getSession();
+        const { data, error } = await safeGetSession();
         return { data: data.session, error };
     },
 

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { safeGetSession } from '@/lib/supabase';
 import {
     Shield,
     Globe,
@@ -39,10 +39,15 @@ export default function AboutPage() {
     }, []);
 
     const checkAuth = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        setIsAuthenticated(!!session);
-        if (session?.user) {
-            setUserRole(session.user.user_metadata?.role || null);
+        try {
+            const { data: { session } } = await safeGetSession();
+            setIsAuthenticated(!!session);
+            if (session?.user) {
+                setUserRole(session.user.user_metadata?.role || null);
+            }
+        } catch {
+            setIsAuthenticated(false);
+            setUserRole(null);
         }
     };
 

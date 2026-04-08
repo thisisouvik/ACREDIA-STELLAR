@@ -1,10 +1,20 @@
-import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { NextRequest, NextResponse } from 'next/server';
+import { getServiceRoleClient, requireAdminRequest } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
+        const adminCheck = await requireAdminRequest(request);
+        if (!adminCheck.ok) {
+            return NextResponse.json(
+                { success: false, error: adminCheck.error },
+                { status: adminCheck.status }
+            );
+        }
+
+        const supabase = getServiceRoleClient();
+
         // Fetch total institutions
         const { count: totalInstitutions, error: institutionsError } = await supabase
             .from('institutions')

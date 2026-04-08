@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useStellarAccount } from '@/contexts/StellarContext';
 import { authorizeIssuer, getContractOwner, isAuthorizedIssuer } from '@/lib/contracts';
+import { supabase, safeGetSession } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Shield, CheckCircle2 } from 'lucide-react';
 
@@ -93,9 +94,20 @@ export function AuthorizeIssuer() {
 
             // Update database to reflect authorization
             try {
+                const {
+                    data: { session },
+                } = await safeGetSession();
+
+                if (!session?.access_token) {
+                    throw new Error('Missing session token');
+                }
+
                 const response = await fetch('/api/admin/update-authorization', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${session.access_token}`,
+                    },
                     body: JSON.stringify({ 
                         walletAddress: walletToAuthorize,
                         transactionHash: hash

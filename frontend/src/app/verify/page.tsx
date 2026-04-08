@@ -2,7 +2,6 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,19 +10,33 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 interface CredentialData {
-    id: string;
     token_id: string;
-    ipfs_hash: string;
-    blockchain_hash: string;
-    metadata: any;
+    ipfs_hash?: string | null;
+    blockchain_hash?: string | null;
+    metadata?: {
+        credentialData?: {
+            studentName?: string;
+            credentialType?: string;
+            degree?: string;
+            major?: string;
+            gpa?: string;
+            issueDate?: string;
+            institutionName?: string;
+            subjects?: Array<{
+                name?: string;
+                marks?: string;
+                maxMarks?: string;
+                grade?: string;
+            }>;
+        };
+    };
     issued_at: string;
     revoked: boolean;
     revoked_at: string | null;
-    student_wallet_address: string;
-    issuer_wallet_address: string;
+    student_wallet_address?: string;
+    issuer_wallet_address?: string;
     institution: {
         name: string;
-        wallet_address: string;
     } | null;
 }
 
@@ -50,111 +63,41 @@ function VerifyContent() {
             setLoading(true);
             setError(null);
 
-            console.log('🔍 Verifying credential with token:', token);
+            const response = await fetch(`/api/verify/${encodeURIComponent(token)}`);
+            const payload = await response.json();
 
-            // Query the credential from Supabase without authentication
-            const { data, error: queryError } = await supabase
-                .from('credentials')
-                .select(`
-                    id,
-                    token_id,
-                    ipfs_hash,
-                    blockchain_hash,
-                    metadata,
-                    issued_at,
-                    revoked,
-                    revoked_at,
-                    student_wallet_address,
-                    issuer_wallet_address,
-                    institution:institutions!credentials_institution_id_fkey (
-                        name,
-                        wallet_address
-                    )
-                `)
-                .eq('token_id', token)
-                .single();
-
-            if (queryError) {
-                console.error('❌ Query error:', queryError);
-
-                // Check if it's an RLS policy error
-                if (queryError.code === 'PGRST116' || queryError.message.includes('policy')) {
-                    // Try anonymous query
-                    const { data: anonData, error: anonError } = await supabase
-                        .from('credentials')
-                        .select('*')
-                        .eq('token_id', token)
-                        .single();
-
-                    if (anonError) {
-                        throw new Error('Credential not found. The token ID may be invalid.');
-                    }
-
-                    setCredential(anonData as any);
-                } else {
-                    throw new Error(queryError.message || 'Failed to fetch credential');
-                }
-            } else if (!data) {
-                throw new Error('Credential not found');
-            } else {
-                // Transform the data: institution comes as array from Supabase join
-                const transformedData: CredentialData = {
-                    ...data,
-                    institution: Array.isArray(data.institution) && data.institution.length > 0
-                        ? data.institution[0]
-                        : null
-                };
-
-                // Fetch metadata from IPFS if ipfs_hash exists
-                if (transformedData.ipfs_hash) {
-                    try {
-                        console.log('📦 Fetching metadata from IPFS:', transformedData.ipfs_hash);
-                        const ipfsUrl = getIPFSUrl(transformedData.ipfs_hash);
-                        const metadataResponse = await fetch(ipfsUrl);
-
-                        if (metadataResponse.ok) {
-                            const ipfsMetadata = await metadataResponse.json();
-                            console.log('✅ IPFS Metadata fetched:', ipfsMetadata);
-
-                            // Merge IPFS metadata with database data (IPFS takes precedence)
-                            transformedData.metadata = ipfsMetadata;
-                        } else {
-                            console.warn('⚠️ Could not fetch IPFS metadata, using database metadata');
-                        }
-                    } catch (ipfsError) {
-                        console.error('❌ Error fetching IPFS metadata:', ipfsError);
-                        console.log('Using database metadata as fallback');
-                    }
-                }
-
-                setCredential(transformedData);
+            if (!response.ok || !payload?.success || !payload?.credential) {
+                throw new Error(payload?.error || 'Credential not found. The token ID may be invalid.');
             }
 
-            // Check if revoked
-            if (data?.revoked) {
+            const safe = payload.credential;
+            const transformedData: CredentialData = {
+                token_id: safe.tokenId,
+                issued_at: safe.issuedAt,
+                revoked: Boolean(safe.revoked),
+                revoked_at: safe.revokedAt || null,
+                institution: safe.institutionName
+                    ? { name: safe.institutionName }
+                    : null,
+                metadata: {
+                    credentialData: {
+                        credentialType: safe.credentialType || undefined,
+                        degree: safe.degree || undefined,
+                        major: safe.major || undefined,
+                        issueDate: safe.issueDate || undefined,
+                        institutionName: safe.institutionName || undefined,
+                    },
+                },
+            };
+
+            setCredential(transformedData);
+
+            if (safe.revoked) {
                 setVerificationStatus('revoked');
-                console.log('⚠️ Credential is revoked');
             } else {
                 setVerificationStatus('valid');
-                console.log('✅ Credential is valid');
             }
-
-            // Log verification attempt
-            try {
-                await supabase.from('verification_logs').insert({
-                    credential_id: data?.id,
-                    verification_result: {
-                        valid: !data?.revoked,
-                        token_id: token,
-                        verified_at: new Date().toISOString(),
-                    },
-                });
-            } catch (logError) {
-                console.warn('Failed to log verification:', logError);
-            }
-
         } catch (err: any) {
-            console.error('❌ Verification error:', err);
             setError(err.message || 'Failed to verify credential');
             setVerificationStatus('invalid');
         } finally {
@@ -170,7 +113,8 @@ function VerifyContent() {
         });
     };
 
-    const getIPFSUrl = (hash: string) => {
+    const getIPFSUrl = (hash?: string | null) => {
+        if (!hash) return '#';
         if (hash.startsWith('http')) return hash;
         return `https://ipfs.io/ipfs/${hash}`;
     };
@@ -726,13 +670,13 @@ function VerifyContent() {
                                             <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700">Marks Obtained</th>
                                             <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700">Max Marks</th>
                                             <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700">Percentage</th>
-                                            {credential.metadata.credentialData.subjects.some((s: any) => s.grade) && (
+                                            {credential.metadata?.credentialData?.subjects?.some((s: any) => s.grade) && (
                                                 <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700">Grade</th>
                                             )}
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {credential.metadata.credentialData.subjects.map((subject: any, index: number) => {
+                                        {credential.metadata?.credentialData?.subjects?.map((subject: any, index: number) => {
                                             const percentage = subject.marks && subject.maxMarks
                                                 ? ((parseFloat(subject.marks) / parseFloat(subject.maxMarks)) * 100).toFixed(2)
                                                 : 'N/A';
@@ -750,7 +694,7 @@ function VerifyContent() {
                                                             {percentage}%
                                                         </span>
                                                     </td>
-                                                    {credential.metadata.credentialData.subjects.some((s: any) => s.grade) && (
+                                                    {credential.metadata?.credentialData?.subjects?.some((s: any) => s.grade) && (
                                                         <td className="text-center py-3 px-4">
                                                             <span className="inline-block px-3 py-1 rounded-full text-sm font-bold bg-purple-100 text-purple-800">
                                                                 {subject.grade || '-'}
@@ -769,14 +713,14 @@ function VerifyContent() {
                                 <div className="bg-blue-50 p-4 rounded-lg text-center">
                                     <p className="text-sm text-gray-600 mb-1">Total Subjects</p>
                                     <p className="text-2xl font-bold text-blue-600">
-                                        {credential.metadata.credentialData.subjects.length}
+                                        {credential.metadata?.credentialData?.subjects?.length || 0}
                                     </p>
                                 </div>
                                 <div className="bg-green-50 p-4 rounded-lg text-center">
                                     <p className="text-sm text-gray-600 mb-1">Average Percentage</p>
                                     <p className="text-2xl font-bold text-green-600">
                                         {(() => {
-                                            const validSubjects = credential.metadata.credentialData.subjects.filter(
+                                            const validSubjects = (credential.metadata?.credentialData?.subjects || []).filter(
                                                 (s: any) => s.marks && s.maxMarks
                                             );
                                             if (validSubjects.length === 0) return 'N/A';
@@ -790,9 +734,9 @@ function VerifyContent() {
                                 <div className="bg-purple-50 p-4 rounded-lg text-center">
                                     <p className="text-sm text-gray-600 mb-1">Total Marks</p>
                                     <p className="text-2xl font-bold text-purple-600">
-                                        {credential.metadata.credentialData.subjects.reduce((acc: number, s: any) =>
+                                        {(credential.metadata?.credentialData?.subjects || []).reduce((acc: number, s: any) =>
                                             acc + (parseFloat(s.marks) || 0), 0
-                                        )} / {credential.metadata.credentialData.subjects.reduce((acc: number, s: any) =>
+                                        )} / {(credential.metadata?.credentialData?.subjects || []).reduce((acc: number, s: any) =>
                                             acc + (parseFloat(s.maxMarks) || 0), 0
                                         )}
                                     </p>
@@ -818,7 +762,8 @@ function VerifyContent() {
                                 </p>
                             </div>
 
-                            <div>
+                            {credential.blockchain_hash && (
+                                <div>
                                 <div className="flex items-center justify-between mb-2">
                                     <p className="text-sm font-semibold text-gray-700">Transaction Hash</p>
                                     <Badge variant="outline" className="text-xs">
@@ -845,9 +790,11 @@ function VerifyContent() {
                                         </a>
                                     </Button>
                                 </div>
-                            </div>
+                                </div>
+                            )}
 
-                            <div>
+                            {credential.ipfs_hash && (
+                                <div>
                                 <div className="flex items-center justify-between mb-2">
                                     <p className="text-sm font-semibold text-gray-700">IPFS Content Hash</p>
                                     <Badge variant="outline" className="text-xs">
@@ -874,7 +821,8 @@ function VerifyContent() {
                                         </a>
                                     </Button>
                                 </div>
-                            </div>
+                                </div>
+                            )}
 
                             <div className="bg-linear-to-r from-blue-50 to-teal-50 p-4 rounded-lg border border-blue-200">
                                 <p className="text-sm text-gray-700 flex items-start">

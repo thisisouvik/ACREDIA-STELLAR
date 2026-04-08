@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getServiceRoleClient, requireAdminRequest } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
     try {
+        const adminCheck = await requireAdminRequest(request);
+        if (!adminCheck.ok) {
+            return NextResponse.json(
+                { success: false, error: adminCheck.error },
+                { status: adminCheck.status }
+            );
+        }
+
+        const supabase = getServiceRoleClient();
+
         const { walletAddress, transactionHash } = await request.json();
 
         if (!walletAddress) {

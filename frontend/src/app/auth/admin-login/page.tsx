@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { supabase } from '@/lib/supabase';
+import { supabase, safeGetSession } from '@/lib/supabase';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -22,11 +22,15 @@ export default function AdminLoginPage() {
     useEffect(() => {
         // Check if already logged in
         const checkSession = async () => {
-            const {
-                data: { session },
-            } = await supabase.auth.getSession();
-            if (session?.user) {
-                router.push('/admin');
+            try {
+                const {
+                    data: { session },
+                } = await safeGetSession();
+                if (session?.user) {
+                    router.push('/admin');
+                }
+            } catch {
+                // Ignore invalid cached sessions and allow normal login flow.
             }
         };
         checkSession();

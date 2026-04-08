@@ -13,6 +13,7 @@ import { useStellarAccount } from '@/contexts/StellarContext';
 import { ConnectWallet } from '@/components/ui/ConnectWallet';
 import { getContractAddress } from '@/lib/stellar';
 import { getContractOwner } from '@/lib/contracts';
+import { supabase, safeGetSession } from '@/lib/supabase';
 import { toast } from 'sonner';
 
 interface AdminStats {
@@ -79,7 +80,21 @@ function AdminDashboardContent() {
         const fetchStats = async () => {
             try {
                 setLoadingStats(true);
-                const response = await fetch('/api/admin/stats');
+                const {
+                    data: { session },
+                } = await safeGetSession();
+
+                if (!session?.access_token) {
+                    toast.error('Your session expired. Please sign in again.');
+                    setLoadingStats(false);
+                    return;
+                }
+
+                const response = await fetch('/api/admin/stats', {
+                    headers: {
+                        Authorization: `Bearer ${session.access_token}`,
+                    },
+                });
                 const data = await response.json();
 
                 if (data.success) {
