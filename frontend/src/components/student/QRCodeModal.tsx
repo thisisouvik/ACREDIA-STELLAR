@@ -149,7 +149,7 @@ export default function QRCodeModal({ open, onClose, credential }: QRCodeModalPr
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="w-[95vw] max-w-[560px] overflow-hidden p-5 sm:p-6">
                 <DialogHeader className="space-y-1">
                     <DialogTitle className="text-xl font-semibold">Share Credential</DialogTitle>
                     <DialogDescription className="text-sm">
@@ -164,14 +164,14 @@ export default function QRCodeModal({ open, onClose, credential }: QRCodeModalPr
                             ref={canvasRef}
                             width={240}
                             height={240}
-                            style={{ display: 'block', maxWidth: '100%', height: 'auto' }}
+                            style={{ display: 'block', width: '240px', maxWidth: '100%', height: 'auto' }}
                         />
                     </div>
 
                     {/* Token ID - Minimal */}
-                    <div className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-md">
+                    <div className="flex flex-col gap-1 px-3 py-2 bg-gray-50 rounded-md sm:flex-row sm:items-center sm:justify-between">
                         <span className="text-xs text-gray-500">Token ID:</span>
-                        <span className="text-sm font-mono font-semibold text-gray-900">
+                        <span className="text-sm font-mono font-semibold text-gray-900 break-all sm:text-right">
                             #{credential?.token_id || 'N/A'}
                         </span>
                     </div>
@@ -179,11 +179,11 @@ export default function QRCodeModal({ open, onClose, credential }: QRCodeModalPr
                     {/* Verification Link - Compact */}
                     <div className="space-y-1.5">
                         <label className="text-xs font-medium text-gray-700">Verification Link</label>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 min-w-0">
                             <Input
                                 value={verificationUrl}
                                 readOnly
-                                className="font-mono text-xs h-9 bg-white"
+                                className="font-mono text-xs h-9 bg-white min-w-0 truncate"
                             />
                             <Button
                                 onClick={handleCopyLink}
@@ -201,7 +201,7 @@ export default function QRCodeModal({ open, onClose, credential }: QRCodeModalPr
                     </div>
 
                     {/* Action Buttons - Streamlined */}
-                    <div className="flex gap-2 pt-2">
+                    <div className="flex flex-col gap-2 pt-2 sm:flex-row">
                         <Button
                             onClick={handleDownload}
                             variant="outline"

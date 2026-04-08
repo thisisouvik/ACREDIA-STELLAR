@@ -17,8 +17,12 @@ function getBearerToken(request: NextRequest): string | null {
     return token;
 }
 
-function hasRequiredEnv(): boolean {
-    return Boolean(supabaseUrl && supabaseAnonKey && supabaseServiceRoleKey);
+function hasPublicEnv(): boolean {
+    return Boolean(supabaseUrl && supabaseAnonKey);
+}
+
+export function hasServiceRoleEnv(): boolean {
+    return Boolean(supabaseUrl && supabaseServiceRoleKey);
 }
 
 function createAnonClient() {
@@ -51,7 +55,53 @@ export async function requireAdminRequest(request: NextRequest): Promise<
     | { ok: true; userId: string }
     | { ok: false; status: number; error: string }
 > {
-    if (!hasRequiredEnv()) {
+    if (!hasServiceRoleEnv()) {
+        return {
+            ok: false,
+            status: 500,
+            error: 'Server configuration error',
+        };
+    }
+
+    const authCheck = await requireAuthenticatedRequest(request);
+    if (!authCheck.ok) {
+        return authCheck;
+    }
+
+    const serviceClient = createServiceRoleClient();
+    const { data: profile, error: profileError } = await serviceClient
+        .from('profiles')
+        .select('role')
+        .eq('id', authCheck.userId)
+        .maybeSingle();
+
+    if (profileError) {
+        return {
+            ok: false,
+            status: 500,
+            error: 'Failed to resolve user role',
+        };
+    }
+
+    if (!profile || profile.role !== 'admin') {
+        return {
+            ok: false,
+            status: 403,
+            error: 'Admin access required',
+        };
+    }
+
+    return {
+        ok: true,
+        userId: authCheck.userId,
+    };
+}
+
+export async function requireAuthenticatedRequest(request: NextRequest): Promise<
+    | { ok: true; userId: string }
+    | { ok: false; status: number; error: string }
+> {
+    if (!hasPublicEnv()) {
         return {
             ok: false,
             status: 500,
@@ -79,29 +129,6 @@ export async function requireAdminRequest(request: NextRequest): Promise<
         };
     }
 
-    const serviceClient = createServiceRoleClient();
-    const { data: profile, error: profileError } = await serviceClient
-        .from('profiles')
-        .select('role')
-        .eq('id', authData.user.id)
-        .maybeSingle();
-
-    if (profileError) {
-        return {
-            ok: false,
-            status: 500,
-            error: 'Failed to resolve user role',
-        };
-    }
-
-    if (!profile || profile.role !== 'admin') {
-        return {
-            ok: false,
-            status: 403,
-            error: 'Admin access required',
-        };
-    }
-
     return {
         ok: true,
         userId: authData.user.id,
@@ -110,4 +137,22 @@ export async function requireAdminRequest(request: NextRequest): Promise<
 
 export function getServiceRoleClient() {
     return createServiceRoleClient();
+}
+
+export function createUserScopedServerClient(accessToken: string) {
+    if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error('Missing Supabase public environment variables');
+    }
+
+    return createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+        },
+        global: {
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+            },
+        },
+    });
 }

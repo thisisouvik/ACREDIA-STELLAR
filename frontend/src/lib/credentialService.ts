@@ -157,6 +157,7 @@ export async function issueCredential(
             metadataUrl,
             issuerAddress
         );
+        const resolvedTokenId = tokenId && tokenId !== 'pending' ? tokenId : transactionHash;
         console.log('✅ Credential issued! Token ID:', tokenId);
         console.log('✅ Transaction:', transactionHash);
 
@@ -165,33 +166,42 @@ export async function issueCredential(
         // Step 6: Save to Supabase database
         console.log('💾 Saving to database...');
 
+        if (!data.institutionId) {
+            throw new Error('Missing institution ID. Please refresh and try again.');
+        }
+
         // Try to find student by wallet address
         const { data: studentData } = await supabase
             .from('students')
             .select('id')
             .eq('wallet_address', data.studentWallet)
-            .single();
+            .maybeSingle();
 
         const { error: dbError } = await supabase.from('credentials').insert({
             student_id: studentData?.id || null,
             student_wallet_address: data.studentWallet, // Store wallet for lookup
             institution_id: data.institutionId,
             issuer_wallet_address: data.institutionWallet, // Store issuer wallet
-            token_id: tokenId,
+            token_id: resolvedTokenId,
             ipfs_hash: metadataPath, // Store full path (CID/filename)
             blockchain_hash: transactionHash,
             metadata: metadata,
             issued_at: new Date().toISOString(),
             revoked: false,
-        }); if (dbError) {
+        });
+
+        if (dbError) {
             console.error('Database save error:', dbError);
-            throw new Error('Failed to save credential to database');
+            const details = [dbError.code, dbError.message, dbError.details]
+                .filter(Boolean)
+                .join(' | ');
+            throw new Error(`Failed to save credential to database: ${details || 'Unknown database error'}`);
         }
 
         console.log('✅ Credential saved to database');
 
         return {
-            tokenId,
+            tokenId: resolvedTokenId,
             transactionHash,
             ipfsHash: fileCID,
             metadataHash: metadataPath,

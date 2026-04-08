@@ -24,11 +24,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
     const [userRole, setUserRole] = useState<'institution' | 'student' | 'admin' | null>(null);
 
+    const resolveUserRole = async (nextUser: User | null) => {
+        if (!nextUser) {
+            setUserRole(null);
+            return;
+        }
+
+        const metadataRole = nextUser.user_metadata?.role as 'institution' | 'student' | 'admin' | undefined;
+        if (metadataRole) {
+            setUserRole(metadataRole);
+            return;
+        }
+
+        // Fallback role resolution for environments where metadata role is missing.
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', nextUser.id)
+            .maybeSingle();
+
+        if (profile?.role === 'admin' || profile?.role === 'institution' || profile?.role === 'student') {
+            setUserRole(profile.role);
+            return;
+        }
+
+        const { data: institutionRow } = await supabase
+            .from('institutions')
+            .select('id')
+            .eq('auth_user_id', nextUser.id)
+            .maybeSingle();
+
+        if (institutionRow?.id) {
+            setUserRole('institution');
+            return;
+        }
+
+        const { data: studentRow } = await supabase
+            .from('students')
+            .select('id')
+            .eq('auth_user_id', nextUser.id)
+            .maybeSingle();
+
+        if (studentRow?.id) {
+            setUserRole('student');
+            return;
+        }
+
+        // Keep app usable if role data is absent.
+        setUserRole('student');
+    };
+
     useEffect(() => {
         // Check active sessions
         safeGetSession().then(({ data: { session } }) => {
-            setUser(session?.user ?? null);
-            setUserRole(session?.user?.user_metadata?.role ?? null);
+            const nextUser = session?.user ?? null;
+            setUser(nextUser);
+            resolveUserRole(nextUser).catch(() => setUserRole(nextUser?.user_metadata?.role ?? 'student'));
             setLoading(false);
         }).catch(() => {
             setUser(null);
@@ -40,8 +91,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
-            setUser(session?.user ?? null);
-            setUserRole(session?.user?.user_metadata?.role ?? null);
+            const nextUser = session?.user ?? null;
+            setUser(nextUser);
+            resolveUserRole(nextUser).catch(() => setUserRole(nextUser?.user_metadata?.role ?? 'student'));
             setLoading(false);
         });
 

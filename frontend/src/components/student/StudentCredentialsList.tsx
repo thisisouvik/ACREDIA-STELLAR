@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/lib/supabase';
+import { safeGetSession, supabase } from '@/lib/supabase';
 import { getIPFSUrl } from '@/lib/ipfs';
 import {
     Award,
@@ -68,34 +68,45 @@ export default function StudentCredentialsList({
         setError(null);
 
         try {
-            if (!studentWallet) {
-                console.log('⚠️ No wallet connected');
+            if (!studentId) {
                 setCredentials([]);
-                setLoading(false);
                 return;
             }
 
-            console.log('🔍 Fetching credentials for wallet:', studentWallet);
-
-            // Fetch credentials by wallet address (case-insensitive)
-            const { data, error: fetchError } = await supabase
-                .from('credentials')
-                .select(`
-                    *,
-                    institution:institutions(name)
-                `)
-                .ilike('student_wallet_address', studentWallet)
-                .order('issued_at', { ascending: false });
-
-            if (fetchError) {
-                console.error('❌ Fetch error:', fetchError);
-                throw fetchError;
+            // Keep student's wallet_address synced for legacy credential linking.
+            if (studentWallet) {
+                await supabase
+                    .from('students')
+                    .update({ wallet_address: studentWallet })
+                    .eq('auth_user_id', studentId);
             }
 
-            console.log('✅ Credentials fetched:', data?.length || 0, 'credentials');
-            console.log('📊 Full data:', data);
+            const {
+                data: { session },
+            } = await safeGetSession();
 
-            setCredentials(data || []);
+            if (!session?.access_token) {
+                setCredentials([]);
+                return;
+            }
+
+            const response = await fetch('/api/student/credentials', {
+                headers: {
+                    Authorization: `Bearer ${session.access_token}`,
+                },
+            });
+
+            const payload = await response.json();
+            if (!response.ok || !payload?.success) {
+                throw new Error(payload?.error || 'Failed to load credentials');
+            }
+
+            const data = ((payload.credentials || []) as Credential[]).sort(
+                (a, b) => new Date(b.issued_at).getTime() - new Date(a.issued_at).getTime()
+            );
+
+            console.log('✅ Credentials fetched:', data.length, 'credentials');
+            setCredentials(data);
         } catch (err: any) {
             console.error('Error loading credentials:', err);
             setError(err.message || 'Failed to load credentials');
@@ -106,7 +117,7 @@ export default function StudentCredentialsList({
 
     useEffect(() => {
         loadCredentials();
-    }, [studentWallet]);
+    }, [studentId, studentWallet]);
 
     // Filter credentials based on search
     const filteredCredentials = credentials.filter((cred) => {
